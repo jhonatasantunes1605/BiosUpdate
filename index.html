@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Placas Mãe</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/modal-video/2.4.4/modal-video.min.css">
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-icon {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: #fff;
+        }
+        .status-pendente {
+            background-color: #ff4d4d;
+        }
+        .status-ok {
+            background-color: #4CAF50;
+        }
+        /* Estilos para o modal */
+        .modal {
+            display: none; /* Ocultar por padrão */
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+            
+        }
+    </style>
+</head>
+<body>
+    <h1>Lista de Placas Mãe</h1>
+    <button id="btnAddMotherboard">Adicionar Placa Mãe</button>
+    <input type="text" id="eanSearchInput" placeholder="Buscar por EAN">
+    <table id="motherboardTable">
+        <thead>
+            <tr>
+                <th>EAN</th>
+                <th>Modelo</th>
+                <th>Link do Fabricante</th>
+                <th>Versão de BIOS</th>
+                <th>Verificador</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- As linhas da tabela serão geradas dinamicamente -->
+        </tbody>
+    </table>
+
+    <!-- Modal para adicionar nova placa mãe -->
+    <div id="addMotherboardModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Adicionar Nova Placa Mãe</h2>
+            <form id="addMotherboardForm">
+                <label for="ean">EAN:</label>
+                <input type="text" id="ean" name="ean" required><br><br>
+                <label for="modelo">Modelo:</label>
+                <input type="text" id="modelo" name="modelo" required><br><br>
+                <label for="link">Link do Fabricante:</label>
+                <input type="text" id="link" name="link" required><br><br>
+                <label for="bios">Versão de BIOS:</label>
+                <input type="text" id="bios" name="bios" required><br><br>
+                <input type="submit" value="Adicionar">
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/parse/2.17.0/parse.min.js"></script>
+    <script>
+        // Inicialize o Parse
+         Parse.initialize("iqopHCeFYry124HyoTvxZElq0vMLvcF89vRObJT6", "DEJVnFH8wWwuXaubQ3fukg6c1jL5Fhz0ToHMfh4m");
+        Parse.serverURL = 'https://parseapi.back4app.com';
+
+        // Função para buscar os dados das placas do servidor
+        async function fetchMotherboards() {
+            const Motherboard = Parse.Object.extend('Motherboard');
+            const query = new Parse.Query(Motherboard);
+            try {
+                const results = await query.find();
+                return results.map(result => ({
+                    id: result.id,
+                    ean: result.get('ean'),
+                    modelo: result.get('modelo'),
+                    link: result.get('link'),
+                    bios: result.get('bios'),
+                    status: result.get('status')
+                }));
+            } catch (error) {
+                console.error('Error while fetching Motherboards', error);
+                return [];
+            }
+        }
+
+        // Função para salvar a versão da BIOS no servidor
+        async function saveBios(id, newBios) {
+            const Motherboard = Parse.Object.extend('Motherboard');
+            const query = new Parse.Query(Motherboard);
+            try {
+                const motherboard = await query.get(id);
+                motherboard.set('bios', newBios);
+                motherboard.set('status', 'ok');
+                await motherboard.save();
+                console.log('Motherboard updated', motherboard);
+            } catch (error) {
+                console.error('Error while updating Motherboard', error);
+            }
+        }
+
+        // Função para adicionar uma nova placa mãe
+        async function addMotherboard(data) {
+            const Motherboard = Parse.Object.extend('Motherboard');
+            const motherboard = new Motherboard();
+            try {
+                const newMotherboard = await motherboard.save(data);
+                console.log('New Motherboard added', newMotherboard);
+                return newMotherboard;
+            } catch (error) {
+                console.error('Error while adding new Motherboard', error);
+                throw error;
+            }
+        }
+
+        async function init() {
+            const motherboards = await fetchMotherboards();
+            const tableBody = document.querySelector('#motherboardTable tbody');
+
+            motherboards.forEach(mb => {
+                const row = document.createElement('tr');
+
+                const eanCell = document.createElement('td');
+                eanCell.textContent = mb.ean;
+                row.appendChild(eanCell);
+
+                const modeloCell = document.createElement('td');
+                modeloCell.textContent = mb.modelo;
+                row.appendChild(modeloCell);
+
+                const linkCell = document.createElement('td');
+                const linkButton = document.createElement('button');
+                linkButton.textContent = 'Site do Fabricante';
+                linkButton.onclick = () => window.open(mb.link, '_blank');
+                linkCell.appendChild(linkButton);
+                row.appendChild(linkCell);
+
+                const biosCell = document.createElement('td');
+                biosCell.textContent = mb.bios;
+                row.appendChild(biosCell);
+
+                const verificadorCell = document.createElement('td');
+                const statusDiv = document.createElement('div');
+                statusDiv.classList.add('status');
+
+                const verificadorInput = document.createElement('input');
+                verificadorInput.type = 'text';
+                verificadorInput.placeholder = 'Versão de BIOS mais recente';
+                statusDiv.appendChild(verificadorInput);
+
+                const saveButton = document.createElement('button');
+                saveButton.textContent = 'Salvar';
+                saveButton.onclick = async () => {
+                    const newBios = verificadorInput.value.trim();
+                    if (newBios) {
+                        await saveBios(mb.id, newBios);
+                        biosCell.textContent = newBios;
+                        verificadorInput.value = '';
+                        verificadorInput.placeholder = 'Verificado';
+                        statusDiv.querySelector('.status-icon').classList.remove('status-pendente');
+                        statusDiv.querySelector('.status-icon').classList.add('status-ok');
+                        statusDiv.querySelector('.status-icon').innerHTML = '<i class="fas fa-check"></i> OK';
+                    }
+                };
+                statusDiv.appendChild(saveButton);
+
+                const statusIcon = document.createElement('span');
+                statusIcon.classList.add('status-icon', mb.status === 'ok' ? 'status-ok' : 'status-pendente');
+                statusIcon.innerHTML = mb.status === 'ok' ? '<i class="fas fa-check"></i> OK' : '<i class="fas fa-times"></i> Pendente';
+                statusDiv.appendChild(statusIcon);
+
+                verificadorCell.appendChild(statusDiv);
+                row.appendChild(verificadorCell);
+
+                tableBody.appendChild(row);
+            });
+
+            // Configura o evento de busca conforme o usuário digita
+            const eanSearchInput = document.getElementById('eanSearchInput');
+            eanSearchInput.addEventListener('input', async () => {
+                const searchTerm = eanSearchInput.value.trim();
+                await filterByEAN(searchTerm);
+            });
+        }
+
+
+    
+
+
+
+        // Função para atualizar a tabela com os dados filtrados
+        function updateTable(motherboards) {
+            const tableBody = document.querySelector('#motherboardTable tbody');
+            tableBody.innerHTML = ''; // Limpa o conteúdo atual da tabela
+
+            motherboards.forEach(mb => {
+                const row = document.createElement('tr');
+
+                const eanCell = document.createElement('td');
+                eanCell.textContent = mb.ean;
+                row.appendChild(eanCell);
+
+                const modeloCell = document.createElement('td');
+                modeloCell.textContent = mb.modelo;
+                row.appendChild(modeloCell);
+
+                const linkCell = document.createElement('td');
+                const linkButton = document.createElement('button');
+                linkButton.textContent = 'Site do Fabricante';
+                linkButton.onclick = () => window.open(mb.link, '_blank');
+                linkCell.appendChild(linkButton);
+                row.appendChild(linkCell);
+
+                const biosCell = document.createElement('td');
+                biosCell.textContent = mb.bios;
+                row.appendChild(biosCell);
+
+                const verificadorCell = document.createElement('td');
+                const statusDiv = document.createElement('div');
+                statusDiv.classList.add('status');
+
+                const verificadorInput = document.createElement('input');
+                verificadorInput.type = 'text';
+                verificadorInput.placeholder = 'Versão de BIOS mais recente';
+                statusDiv.appendChild(verificadorInput);
+
+                const saveButton = document.createElement('button');
+                saveButton.textContent = 'Salvar';
+                saveButton.onclick = async () => {
+                    const newBios = verificadorInput.value.trim();
+                    if (newBios) {
+                        await saveBios(mb.id, newBios);
+                        biosCell.textContent = newBios;
+                        verificadorInput.value = '';
+                        verificadorInput.placeholder = 'Verificado';
+                        statusDiv.querySelector('.status-icon').classList.remove('status-pendente');
+                        statusDiv.querySelector('.status-icon').classList.add('status-ok');
+                        statusDiv.querySelector('.status-icon').innerHTML = '<i class="fas fa-check"></i> OK';
+                    }
+                };
+                statusDiv.appendChild(saveButton);
+
+                const statusIcon = document.createElement('span');
+                statusIcon.classList.add('status-icon', mb.status === 'ok' ? 'status-ok' : 'status-pendente');
+                statusIcon.innerHTML = mb.status === 'ok' ? '<i class="fas fa-check"></i> OK' : '<i class="fas fa-times"></i> Pendente';
+                statusDiv.appendChild(statusIcon);
+
+                verificadorCell.appendChild(statusDiv);
+                row.appendChild(verificadorCell);
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Função para verificar se hoje é sexta-feira
+        function checkFriday() {
+            const today = new Date();
+            const day = today.getDay();
+            if (day === 5) {
+                document.querySelectorAll('th, td').forEach(cell => {
+                    cell.classList.add('check-bios');
+                });
+            }
+        }
+
+        // Abrir o modal ao clicar no botão "Adicionar Placa Mãe"
+        const addMotherboardModal = document.getElementById('addMotherboardModal');
+        const btnAddMotherboard = document.getElementById('btnAddMotherboard');
+        const closeModalBtn = document.querySelector('#addMotherboardModal .close');
+        btnAddMotherboard.onclick = () => addMotherboardModal.style.display = "block";
+        closeModalBtn.onclick = () => addMotherboardModal.style.display = "none";
+        
+        // Fechar o modal clicando fora dele
+        window.onclick = event => {
+            if (event.target === addMotherboardModal) {
+                addMotherboardModal.style.display = "none";
+            }
+        };
+
+        // Adicionar uma nova placa mãe ao enviar o formulário
+        const addMotherboardForm = document.getElementById('addMotherboardForm');
+        addMotherboardForm.onsubmit = async event => {
+            event.preventDefault();
+            const formData = new FormData(addMotherboardForm);
+            const data = {
+                ean: formData.get('ean'),
+                modelo: formData.get('modelo'),
+                link: formData.get('link'),
+                bios: formData.get('bios'),
+                status: 'pendente' // Status inicial pendente
+            };
+            try {
+                await addMotherboard(data);
+                addMotherboardModal.style.display = "none";
+                // Atualizar a tabela após adicionar uma nova placa mãe
+                const eanSearchInput = document.getElementById('eanSearchInput');
+                eanSearchInput.value = ''; // Limpa o campo de busca
+                await init(); // Recarrega os dados da tabela
+            } catch (error) {
+                console.error('Error adding new motherboard', error);
+            }
+        };
+
+        // Inicializa a tabela ao carregar a página
+        window.onload = async () => {
+            await init();
+            checkFriday();
+        };
+    </script>
+</body>
+</html>
