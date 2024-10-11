@@ -1,179 +1,48 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Placas Mãe</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            border: 1px solid #000;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .status {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .status-icon {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 5px;
-            color: #fff;
-        }
-        .status-pendente {
-            background-color: #ff4d4d;
-        }
-        .status-ok {
-            background-color: #4CAF50;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gravador de Vídeo</title>
 </head>
 <body>
-    <h1>Lista de Placas Mãe</h1>
-    <table id="motherboardTable">
-        <thead>
-            <tr>
-                <th>EAN</th>
-                <th>Modelo</th>
-                <th>Link do Fabricante</th>
-                <th>Versão de BIOS</th>
-                <th>Verificador</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- As linhas da tabela serão geradas dinamicamente -->
-        </tbody>
-    </table>
+  <video id="video" width="640" height="480" autoplay></video>
+  <script>
+    let mediaRecorder;
+    let chunks = [];
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/parse/2.17.0/parse.min.js"></script>
-    <script>
-        // Inicialize o Parse
-        Parse.initialize("iqopHCeFYry124HyoTvxZElq0vMLvcF89vRObJT6", "DEJVnFH8wWwuXaubQ3fukg6c1jL5Fhz0ToHMfh4m");
-        Parse.serverURL = 'https://parseapi.back4app.com';
+    // Acessar a câmera
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        const video = document.getElementById('video');
+        video.srcObject = stream;
 
-        // Função para buscar os dados das placas do servidor
-        async function fetchMotherboards() {
-            const Motherboard = Parse.Object.extend('Motherboard');
-            const query = new Parse.Query(Motherboard);
-            try {
-                const results = await query.find();
-                return results.map(result => ({
-                    id: result.id,
-                    ean: result.get('ean'),
-                    modelo: result.get('modelo'),
-                    link: result.get('link'),
-                    bios: result.get('bios'),
-                    status: result.get('status')
-                }));
-            } catch (error) {
-                console.error('Error while fetching Motherboards', error);
-                return [];
-            }
-        }
+        // Iniciar a gravação automaticamente
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.start();
 
-        // Função para salvar a versão da BIOS no servidor
-        async function saveBios(id, newBios) {
-            const Motherboard = Parse.Object.extend('Motherboard');
-            const query = new Parse.Query(Motherboard);
-            try {
-                const motherboard = await query.get(id);
-                motherboard.set('bios', newBios);
-                motherboard.set('status', 'ok');
-                await motherboard.save();
-                console.log('Motherboard updated', motherboard);
-            } catch (error) {
-                console.error('Error while updating Motherboard', error);
-            }
-        }
+        mediaRecorder.ondataavailable = event => chunks.push(event.data);
 
-        async function init() {
-            const motherboards = await fetchMotherboards();
-            const tableBody = document.querySelector('#motherboardTable tbody');
+        // Pressionar "G" para parar a gravação
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'g' || event.key === 'G') {
+            mediaRecorder.stop();
+          }
+        });
 
-            motherboards.forEach(mb => {
-                const row = document.createElement('tr');
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const videoURL = URL.createObjectURL(blob);
 
-                const eanCell = document.createElement('td');
-                eanCell.textContent = mb.ean;
-                row.appendChild(eanCell);
-
-                const modeloCell = document.createElement('td');
-                modeloCell.textContent = mb.modelo;
-                row.appendChild(modeloCell);
-
-                const linkCell = document.createElement('td');
-                const linkButton = document.createElement('button');
-                linkButton.textContent = 'Site do Fabricante';
-                linkButton.onclick = () => window.open(mb.link, '_blank');
-                linkCell.appendChild(linkButton);
-                row.appendChild(linkCell);
-
-                const biosCell = document.createElement('td');
-                biosCell.textContent = mb.bios;
-                row.appendChild(biosCell);
-
-                const verificadorCell = document.createElement('td');
-                const statusDiv = document.createElement('div');
-                statusDiv.classList.add('status');
-
-                const verificadorInput = document.createElement('input');
-                verificadorInput.type = 'text';
-                verificadorInput.placeholder = 'Versão de BIOS mais recente';
-                statusDiv.appendChild(verificadorInput);
-
-                const saveButton = document.createElement('button');
-                saveButton.textContent = 'Salvar';
-                saveButton.onclick = async () => {
-                    const newBios = verificadorInput.value.trim();
-                    if (newBios) {
-                        await saveBios(mb.id, newBios);
-                        biosCell.textContent = newBios;
-                        verificadorInput.value = '';
-                        verificadorInput.placeholder = 'Verificado';
-                        statusDiv.querySelector('.status-icon').classList.remove('status-pendente');
-                        statusDiv.querySelector('.status-icon').classList.add('status-ok');
-                        statusDiv.querySelector('.status-icon').innerHTML = '<i class="fas fa-check"></i> OK';
-                    }
-                };
-                statusDiv.appendChild(saveButton);
-
-                const statusIcon = document.createElement('span');
-                statusIcon.classList.add('status-icon', mb.status === 'ok' ? 'status-ok' : 'status-pendente');
-                statusIcon.innerHTML = mb.status === 'ok' ? '<i class="fas fa-check"></i> OK' : '<i class="fas fa-times"></i> Pendente';
-                statusDiv.appendChild(statusIcon);
-
-                verificadorCell.appendChild(statusDiv);
-                row.appendChild(verificadorCell);
-
-                tableBody.appendChild(row);
-            });
-        }
-
-        // Função para verificar se hoje é sexta-feira
-        function checkFriday() {
-            const today = new Date();
-            const day = today.getDay();
-            if (day === 5) {
-                document.querySelectorAll('th, td').forEach(cell => {
-                    cell.classList.add('check-bios');
-                });
-            }
-        }
-
-        // Verificar se hoje é sexta-feira ao carregar a página
-        checkFriday();
-
-        // Inicializa a tabela ao carregar a página
-        window.onload = init;
-    </script>
+          // Fazer algo com o vídeo, como baixá-lo automaticamente
+          const a = document.createElement('a');
+          a.href = videoURL;
+          a.download = 'gravacao.webm';
+          document.body.appendChild(a);
+          a.click();
+        };
+      })
+      .catch(error => console.error('Erro ao acessar a câmera:', error));
+  </script>
 </body>
 </html>
