@@ -3,44 +3,205 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo</title>
+  <title>Gravador de Vídeo Estilo OBS</title>
+  <style>
+    /* Configurações gerais de layout e cores */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #1c1c1c;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    #container {
+      width: 800px;
+      background-color: #2b2b2b;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Estilos do vídeo */
+    video {
+      width: 100%;
+      height: auto;
+      border-bottom: 2px solid #000;
+    }
+
+    /* Indicador de gravação */
+    #recording-indicator {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 30px;
+      height: 30px;
+      background-color: red;
+      border-radius: 50%;
+      display: none;
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+    }
+
+    /* Barra de controle estilo OBS */
+    #controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      background-color: #3d3d3d;
+    }
+
+    /* Temporizador de gravação */
+    #timer {
+      font-size: 24px;
+      font-weight: bold;
+      padding: 5px;
+      color: #00ff00;
+    }
+
+    /* Botão de parar a gravação */
+    .stop-button {
+      background-color: #ff3b3b;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+
+    .stop-button:hover {
+      background-color: #ff0000;
+    }
+
+    /* Mensagem de instrução */
+    #message {
+      font-size: 16px;
+      color: #b3b3b3;
+    }
+
+    /* Estilos de alinhamento geral */
+    .centered {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Configurações de layout responsivo */
+    @media (max-width: 768px) {
+      #container {
+        width: 100%;
+        margin: 0 10px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <video id="video" width="640" height="480" autoplay></video>
+  <div id="container">
+    <div id="recording-indicator"></div>
+    <video id="video" autoplay></video>
+    
+    <div id="controls" class="centered">
+      <div id="timer">00:00</div>
+      <div id="message">PRESSIONE "G" PARA ENCERRAR A GRAVAÇÃO</div>
+      <button class="stop-button" id="stopButton">Parar Gravação</button>
+    </div>
+  </div>
+
   <script>
     let mediaRecorder;
     let chunks = [];
+    let startTime;
+    let timerInterval;
+
+    // Configurações para capturar a qualidade máxima suportada pela câmera
+    const constraints = {
+      video: {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 60 },
+        aspectRatio: 16 / 9,
+      }
+    };
 
     // Acessar a câmera
-    navigator.mediaDevices.getUserMedia({ video: true })
+    navigator.mediaDevices.getUserMedia(constraints)
       .then(stream => {
         const video = document.getElementById('video');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        const timerElement = document.getElementById('timer');
+        const messageElement = document.getElementById('message');
+        const stopButton = document.getElementById('stopButton');
+
         video.srcObject = stream;
 
         // Iniciar a gravação automaticamente
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.start();
+        startTime = Date.now();
+        recordingIndicator.style.display = 'block'; // Mostrar a bola vermelha
+        startTimer(); // Iniciar o temporizador
 
         mediaRecorder.ondataavailable = event => chunks.push(event.data);
 
-        // Pressionar "G" para parar a gravação
+        // Pressionar "G" ou clicar no botão para parar a gravação
         document.addEventListener('keydown', function(event) {
           if (event.key === 'g' || event.key === 'G') {
-            mediaRecorder.stop();
+            stopRecording();
           }
         });
+
+        stopButton.addEventListener('click', stopRecording);
+
+        function stopRecording() {
+          mediaRecorder.stop();
+          recordingIndicator.style.display = 'none'; // Esconder a bola vermelha
+          stopTimer(); // Parar o temporizador
+          messageElement.textContent = ''; // Esconder a mensagem
+        }
 
         mediaRecorder.onstop = () => {
           const blob = new Blob(chunks, { type: 'video/webm' });
           const videoURL = URL.createObjectURL(blob);
 
-          // Fazer algo com o vídeo, como baixá-lo automaticamente
+          // Gerar o nome do arquivo no formato "RMA D-02-10-24 H-13-30"
+          const date = new Date();
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = String(date.getFullYear()).slice(-2); // Pegando apenas os dois últimos dígitos do ano
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+
+          const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.mkv`;
+
+          // Baixar o arquivo automaticamente com o nome gerado
           const a = document.createElement('a');
           a.href = videoURL;
-          a.download = 'gravacao.webm';
+          a.download = fileName;  // Usar a extensão .mkv
           document.body.appendChild(a);
           a.click();
         };
+
+        // Função para iniciar o temporizador
+        function startTimer() {
+          timerInterval = setInterval(() => {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
+            const seconds = String(elapsedTime % 60).padStart(2, '0');
+            timerElement.textContent = `${minutes}:${seconds}`;
+          }, 1000);
+        }
+
+        // Função para parar o temporizador
+        function stopTimer() {
+          clearInterval(timerInterval);
+          timerElement.textContent = '00:00';
+        }
       })
       .catch(error => console.error('Erro ao acessar a câmera:', error));
   </script>
