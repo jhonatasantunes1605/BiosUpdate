@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo V1.0</title>
+  <title>Gravador de Vídeo Estilo OBS</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -16,6 +16,7 @@
       justify-content: center;
       align-items: center;
       height: 100vh;
+      flex-direction: column;
     }
 
     #container {
@@ -92,11 +93,72 @@
       justify-content: center;
     }
 
+    /* Tarja verde de sucesso */
+    #success-message {
+      display: none;
+      background-color: #28a745;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      font-size: 16px;
+      margin-top: 20px;
+      border-radius: 5px;
+      width: 100%;
+    }
+
+    /* Indicador de carregamento */
+    #loading {
+      display: none;
+      color: #00ff00;
+      font-size: 18px;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    /* Campo de texto com o link e botão de copiar */
+    #link-container {
+      display: none;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    #video-link {
+      background-color: white;
+      color: black;
+      width: 80%;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    #copy-button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+
+    #copy-button:hover {
+      background-color: #0056b3;
+    }
+
     /* Configurações de layout responsivo */
     @media (max-width: 768px) {
       #container {
         width: 100%;
         margin: 0 10px;
+      }
+
+      #video-link {
+        width: 100%;
       }
     }
   </style>
@@ -111,6 +173,13 @@
       <div id="message">PRESSIONE "G" PARA ENCERRAR A GRAVAÇÃO</div>
       <button class="stop-button" id="stopButton">Parar Gravação</button>
     </div>
+  </div>
+
+  <div id="success-message">Vídeo salvo com sucesso!</div>
+  <div id="loading">Salvando vídeo e gerando link, por favor aguarde...</div>
+  <div id="link-container">
+    <input type="text" id="video-link" readonly>
+    <button id="copy-button">Copiar Link</button>
   </div>
 
   <!-- Adicione o SDK do Google Identity Services -->
@@ -141,7 +210,6 @@
         callback: (response) => {
           console.log('Autenticação bem-sucedida:', response);
           accessToken = response.access_token; // Armazenar o token de acesso
-          console.log('Access Token:', accessToken); // Verifique o token aqui
           startRecording(); // Iniciar a gravação após a autenticação
         },
       });
@@ -161,6 +229,9 @@
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', blob);
 
+      // Exibir o indicador de carregamento
+      document.getElementById('loading').style.display = 'block';
+
       fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
         method: 'POST',
         headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
@@ -174,8 +245,26 @@
       })
       .then((data) => {
         console.log('Upload realizado com sucesso:', data);
-        alert(`Vídeo salvo como ${fileName}`);
-        setTimeout(() => window.close(), 3000);  // Fecha a janela após 3 segundos
+        
+        // Ocultar o indicador de carregamento
+        document.getElementById('loading').style.display = 'none';
+
+        // Exibir a tarja de sucesso
+        document.getElementById('success-message').style.display = 'block';
+
+        // Exibir o campo com o link do vídeo salvo e o botão "Copiar"
+        const videoLink = `https://drive.google.com/file/d/${data.id}/view`;
+        const linkInput = document.getElementById('video-link');
+        linkInput.value = videoLink;
+        document.getElementById('link-container').style.display = 'block';
+
+        // Função para copiar o link para a área de transferência e fechar a janela
+        document.getElementById('copy-button').addEventListener('click', () => {
+          linkInput.select();
+          document.execCommand('copy');
+          alert('Link copiado para a área de transferência!');
+          window.close(); // Fechar a janela
+        });
       })
       .catch((error) => {
         console.error('Erro ao fazer upload para o Google Drive:', error);
@@ -183,22 +272,17 @@
       });
     }
 
-    // Acessar a câmera
-    navigator.mediaDevices.getUserMedia(constraints)
+    // Função para iniciar a gravação
+    function startRecording() {
+      navigator.mediaDevices.getUserMedia(constraints)
       .then(stream => {
-        const video = document.getElementById('video');
-        const recordingIndicator = document.getElementById('recording-indicator');
-        const timerElement = document.getElementById('timer');
-        const messageElement = document.getElementById('message');
-        const stopButton = document.getElementById('stopButton');
+        const videoElement = document.getElementById('video');
+        videoElement.srcObject = stream;
 
-        video.srcObject = stream;
-
-        // Iniciar a gravação automaticamente
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.start();
         startTime = Date.now();
-        recordingIndicator.style.display = 'block'; // Mostrar a bola vermelha
+        document.getElementById('recording-indicator').style.display = 'block'; // Mostrar a bola vermelha
         startTimer(); // Iniciar o temporizador
 
         mediaRecorder.ondataavailable = event => chunks.push(event.data);
@@ -214,9 +298,9 @@
 
         function stopRecording() {
           mediaRecorder.stop();
-          recordingIndicator.style.display = 'none'; // Esconder a bola vermelha
+          document.getElementById('recording-indicator').style.display = 'none'; // Esconder a bola vermelha
           stopTimer(); // Parar o temporizador
-          messageElement.textContent = ''; // Esconder a mensagem
+          document.getElementById('message').textContent = ''; // Esconder a mensagem
         }
 
         mediaRecorder.onstop = () => {
@@ -243,20 +327,21 @@
             const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
             const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
             const seconds = String(elapsedTime % 60).padStart(2, '0');
-            timerElement.textContent = `${minutes}:${seconds}`;
+            document.getElementById('timer').textContent = `${minutes}:${seconds}`;
           }, 1000);
         }
 
         // Função para parar o temporizador
         function stopTimer() {
           clearInterval(timerInterval);
-          timerElement.textContent = '00:00'; // Reiniciar o temporizador
+          document.getElementById('timer').textContent = '00:00'; // Reiniciar o temporizador
         }
       })
       .catch(error => {
         console.error('Erro ao acessar a câmera:', error);
         alert('Erro ao acessar a câmera: ' + error.message);
       });
+    }
 
     // Autenticar ao carregar a página
     window.onload = authenticate;
