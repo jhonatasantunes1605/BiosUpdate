@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Pacotes V3.5</title>
+  <title>Gravador de Vídeo Pacotes V3</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -179,9 +179,10 @@
   <div id="loading">Salvando vídeo e gerando link, por favor aguarde...</div>
   <div id="link-container">
     <input type="text" id="video-link" readonly>
-    <button id="copy-button">Copiar Link (G)</button>
+    <button id="copy-button">Copiar Link (G)</button> <!-- Botão para copiar o link -->
   </div>
 
+  <!-- Adicione o SDK do Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <script>
@@ -189,8 +190,10 @@
     let chunks = [];
     let startTime;
     let timerInterval;
-    let accessToken = localStorage.getItem('accessToken') || '';
+    let accessToken = localStorage.getItem('accessToken');
+    let tokenExpiresAt = localStorage.getItem('tokenExpiresAt');
 
+    // Configurações para capturar a qualidade máxima suportada pela câmera
     const constraints = {
       video: {
         width: { ideal: 1920 },
@@ -200,62 +203,54 @@
       }
     };
 
-    // Função para autenticar com Google Identity Services apenas uma vez
+    // Função para autenticar com Google Identity Services
     function authenticate() {
-      if (accessToken) {
-        // Verificar se o token ainda é válido
-        verifyTokenValidity().then(isValid => {
-          if (isValid) {
-            startRecording();
-          } else {
-            requestNewToken();
-          }
-        });
-      } else {
-        requestNewToken();
-      }
-    }
-
-    // Função para solicitar um novo token
-    function requestNewToken() {
       const client = google.accounts.oauth2.initTokenClient({
         client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com', // Substitua pelo seu Client ID
         scope: 'https://www.googleapis.com/auth/drive.file',
         callback: (response) => {
           console.log('Autenticação bem-sucedida:', response);
           accessToken = response.access_token;
-          localStorage.setItem('accessToken', accessToken); // Salvar o token no localStorage
+          const expiresIn = response.expires_in; // Tempo de expiração do token em segundos
+          const expirationTime = Date.now() + expiresIn * 1000; // Calcula o tempo de expiração
+
+          // Salva o token e o tempo de expiração no localStorage
+          localStorage.setItem('accessToken', accessToken);
+          localStorage.setItem('tokenExpiresAt', expirationTime);
+          
           startRecording(); // Iniciar a gravação após a autenticação
         },
       });
+
       client.requestAccessToken();
     }
 
-    // Função para verificar a validade do token
-    function verifyTokenValidity() {
-      return fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + accessToken)
-        .then(response => {
-          if (response.ok) {
-            return true; // Token válido
-          } else {
-            return false; // Token expirado ou inválido
-          }
-        })
-        .catch(() => false);
+    // Função para verificar se o token expirou
+    function checkTokenExpiration() {
+      const now = Date.now();
+      if (!accessToken || !tokenExpiresAt || now >= tokenExpiresAt) {
+        console.log('Token expirado ou inexistente. Reautenticando...');
+        authenticate();
+        return false;
+      }
+      return true;
     }
 
     // Função para carregar o arquivo no Google Drive
     function uploadToDrive(blob, fileName) {
+      if (!checkTokenExpiration()) return; // Verificar a validade do token
+
       const metadata = {
         'name': fileName,
         'mimeType': 'video/webm',
-        'parents': ['1-3GvrQ8LXVmLuzqqwJ0c_gd0SqVdTPAR'] // ID da pasta no Google Drive
+        'parents': ['1-3GvrQ8LXVmLuzqqwJ0c_gd0SqVdTPAR'] // ID da pasta no Google Drive onde você deseja salvar o arquivo
       };
 
       const form = new FormData();
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', blob);
 
+      // Exibir o indicador de carregamento
       document.getElementById('loading').style.display = 'block';
 
       fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
@@ -263,44 +258,42 @@
         headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
         body: form,
       })
-      .then(res => {
+      .then((res) => {
         if (!res.ok) {
-          // Se o token estiver expirado, solicitar um novo token
-          if (res.status === 401) {
-            console.log('Token expirado, solicitando novo token...');
-            requestNewToken();
-          } else {
-            throw new Error(`HTTP error! status: ${res.status}, statusText: ${res.statusText}`);
-          }
+          throw new Error(`Erro: ${res.statusText}`);
         }
         return res.json();
       })
-      .then(data => {
-        console.log('Upload realizado com sucesso:', data);
+      .then((data) => {
+        const fileId = data.id;
+        const link = `https://drive.google.com/file/d/${fileId}/view`;
 
+        // Atualizar a interface após o sucesso do upload
         document.getElementById('loading').style.display = 'none';
         document.getElementById('success-message').style.display = 'block';
-
-        const videoLink = `https://drive.google.com/file/d/${data.id}/view`;
+        document.getElementById('link-container').style.display = 'block';
         const linkInput = document.getElementById('video-link');
-        linkInput.value = videoLink;
-        document.getElementById('link-container').style.display = 'flex';
+        linkInput.value = link;
 
-        document.getElementById('copy-button').onclick = function() {
+        // Botão para copiar o link
+        const copyButton = document.getElementById('copy-button');
+        copyButton.addEventListener('click', () => {
           linkInput.select();
-          document.execCommand('copy');
-          window.close();
-        };
+          document.execCommand('copy'); // Copiar o link
+          window.close(); // Fechar a janela
+        });
 
+        // Ação da tecla "G" para copiar o link e fechar a janela
         document.addEventListener('keydown', function(event) {
           if (event.key === 'g' || event.key === 'G') {
             linkInput.select();
-            document.execCommand('copy');
-            window.close();
+            document.execCommand('copy'); // Copiar o link
+            window.close(); // Fechar a janela
           }
         });
       })
       .catch((error) => {
+        // Ocultar o indicador de carregamento em caso de erro
         document.getElementById('loading').style.display = 'none';
         console.error('Erro no upload para o Google Drive:', error);
         alert('Erro no upload para o Google Drive: ' + error.message);
@@ -322,6 +315,7 @@
 
         mediaRecorder.ondataavailable = event => chunks.push(event.data);
 
+        // Pressionar "G" ou clicar no botão para parar a gravação
         document.addEventListener('keydown', function(event) {
           if (event.key === 'g' || event.key === 'G') {
             stopRecording();
@@ -352,9 +346,11 @@
 
           const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.mkv`;
 
+          // Upload para o Google Drive
           uploadToDrive(blob, fileName);
         };
 
+        // Função para iniciar o temporizador
         function startTimer() {
           timerInterval = setInterval(() => {
             const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
@@ -364,6 +360,7 @@
           }, 1000);
         }
 
+        // Função para parar o temporizador
         function stopTimer() {
           clearInterval(timerInterval);
           document.getElementById('timer').textContent = '00:00'; // Reiniciar o temporizador
@@ -375,8 +372,14 @@
       });
     }
 
-    // Autenticar ao carregar a página
-    window.onload = authenticate;
+    // Verificar o token ao carregar a página
+    window.onload = () => {
+      if (!checkTokenExpiration()) {
+        authenticate();
+      } else {
+        startRecording();
+      }
+    };
   </script>
 </body>
 </html>
