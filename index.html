@@ -136,11 +136,12 @@
     // Função para autenticar com Google Identity Services
     function authenticate() {
       const client = google.accounts.oauth2.initTokenClient({
-        client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com',
+        client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com', // Substitua pelo seu Client ID
         scope: 'https://www.googleapis.com/auth/drive.file',
         callback: (response) => {
           console.log('Autenticação bem-sucedida:', response);
           accessToken = response.access_token; // Armazenar o token de acesso
+          console.log('Access Token:', accessToken); // Verifique o token aqui
           startRecording(); // Iniciar a gravação após a autenticação
         },
       });
@@ -164,93 +165,101 @@
         method: 'POST',
         headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
         body: form,
-      }).then((res) => res.json())
-        .then((data) => {
-          console.log('Upload realizado com sucesso:', data);
-          alert(`Vídeo salvo como ${fileName}`);
-          setTimeout(() => window.close(), 3000);  // Fecha a janela após 3 segundos
-        })
-        .catch((error) => {
-          console.error('Erro ao fazer upload para o Google Drive:', error);
+      })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}, statusText: ${res.statusText}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log('Upload realizado com sucesso:', data);
+        alert(`Vídeo salvo como ${fileName}`);
+        setTimeout(() => window.close(), 3000);  // Fecha a janela após 3 segundos
+      })
+      .catch((error) => {
+        console.error('Erro ao fazer upload para o Google Drive:', error);
+        alert('Erro ao fazer upload: ' + error.message);
+      });
+    }
+
+    // Acessar a câmera
+    navigator.mediaDevices.getUserMedia(constraints)
+      .then(stream => {
+        const video = document.getElementById('video');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        const timerElement = document.getElementById('timer');
+        const messageElement = document.getElementById('message');
+        const stopButton = document.getElementById('stopButton');
+
+        video.srcObject = stream;
+
+        // Iniciar a gravação automaticamente
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.start();
+        startTime = Date.now();
+        recordingIndicator.style.display = 'block'; // Mostrar a bola vermelha
+        startTimer(); // Iniciar o temporizador
+
+        mediaRecorder.ondataavailable = event => chunks.push(event.data);
+
+        // Pressionar "G" ou clicar no botão para parar a gravação
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'g' || event.key === 'G') {
+            stopRecording();
+          }
         });
-    }
 
-    // Função para iniciar a gravação após a autenticação
-    function startRecording() {
-      navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-          const video = document.getElementById('video');
-          const recordingIndicator = document.getElementById('recording-indicator');
-          const timerElement = document.getElementById('timer');
-          const messageElement = document.getElementById('message');
-          const stopButton = document.getElementById('stopButton');
+        stopButton.addEventListener('click', stopRecording);
 
-          video.srcObject = stream;
+        function stopRecording() {
+          mediaRecorder.stop();
+          recordingIndicator.style.display = 'none'; // Esconder a bola vermelha
+          stopTimer(); // Parar o temporizador
+          messageElement.textContent = ''; // Esconder a mensagem
+        }
 
-          // Iniciar a gravação automaticamente
-          mediaRecorder = new MediaRecorder(stream);
-          mediaRecorder.start();
-          startTime = Date.now();
-          recordingIndicator.style.display = 'block'; // Mostrar a bola vermelha
-          startTimer(); // Iniciar o temporizador
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const videoURL = URL.createObjectURL(blob);
 
-          mediaRecorder.ondataavailable = event => chunks.push(event.data);
+          // Gerar o nome do arquivo no formato "RMA D-02-10-24 H-13-30"
+          const date = new Date();
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = String(date.getFullYear()).slice(-2); // Pegando apenas os dois últimos dígitos do ano
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
 
-          // Pressionar "G" ou clicar no botão para parar a gravação
-          document.addEventListener('keydown', function(event) {
-            if (event.key === 'g' || event.key === 'G') {
-              stopRecording();
-            }
-          });
+          const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.mkv`;
 
-          stopButton.addEventListener('click', stopRecording);
+          // Upload para o Google Drive
+          uploadToDrive(blob, fileName);
+        };
 
-          function stopRecording() {
-            mediaRecorder.stop();
-            recordingIndicator.style.display = 'none'; // Esconder a bola vermelha
-            stopTimer(); // Parar o temporizador
-            messageElement.textContent = ''; // Esconder a mensagem
-          }
+        // Função para iniciar o temporizador
+        function startTimer() {
+          timerInterval = setInterval(() => {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
+            const seconds = String(elapsedTime % 60).padStart(2, '0');
+            timerElement.textContent = `${minutes}:${seconds}`;
+          }, 1000);
+        }
 
-          mediaRecorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
+        // Função para parar o temporizador
+        function stopTimer() {
+          clearInterval(timerInterval);
+          timerElement.textContent = '00:00'; // Reiniciar o temporizador
+        }
+      })
+      .catch(error => {
+        console.error('Erro ao acessar a câmera:', error);
+        alert('Erro ao acessar a câmera: ' + error.message);
+      });
 
-            // Gerar o nome do arquivo no formato "RMA D-02-10-24 H-13-30"
-            const date = new Date();
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = String(date.getFullYear()).slice(-2); // Pegando apenas os dois últimos dígitos do ano
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-
-            const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.webm`;
-
-            // Chamar a função para upload no Google Drive
-            uploadToDrive(blob, fileName);
-          };
-
-          // Função para iniciar o temporizador
-          function startTimer() {
-            timerInterval = setInterval(() => {
-              const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-              const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
-              const seconds = String(elapsedTime % 60).padStart(2, '0');
-              timerElement.textContent = `${minutes}:${seconds}`;
-            }, 1000);
-          }
-
-          // Função para parar o temporizador
-          function stopTimer() {
-            clearInterval(timerInterval);
-            timerElement.textContent = '00:00';
-          }
-        })
-        .catch(error => console.error('Erro ao acessar a câmera:', error));
-    }
-
-    // Autenticação automática ao carregar a página
-    window.addEventListener('load', authenticate);
-
+    // Autenticar ao carregar a página
+    window.onload = authenticate;
   </script>
 </body>
 </html>
