@@ -190,7 +190,7 @@
     let chunks = [];
     let startTime;
     let timerInterval;
-    let accessToken = ''; // Variável global para armazenar o token de acesso
+    let accessToken = localStorage.getItem('accessToken') || ''; // Obter token do localStorage
 
     // Configurações para capturar a qualidade máxima suportada pela câmera
     const constraints = {
@@ -214,6 +214,7 @@
           callback: (response) => {
             console.log('Autenticação bem-sucedida:', response);
             accessToken = response.access_token; // Armazenar o token de acesso
+            localStorage.setItem('accessToken', accessToken); // Salvar o token no localStorage
             startRecording(); // Iniciar a gravação após a autenticação
           },
         });
