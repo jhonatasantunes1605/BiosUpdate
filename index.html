@@ -128,7 +128,7 @@
     #video-link {
       background-color: white;
       color: black;
-      width: 80%;
+      width: 70%;
       padding: 10px;
       border-radius: 5px;
       margin-bottom: 10px;
@@ -179,7 +179,7 @@
   <div id="loading">Salvando vídeo e gerando link, por favor aguarde...</div>
   <div id="link-container">
     <input type="text" id="video-link" readonly>
-    <button id="copy-button">Copiar Link</button>
+    <button id="copy-button">Copiar Link (G)</button> <!-- Botão para copiar o link -->
   </div>
 
   <!-- Adicione o SDK do Google Identity Services -->
@@ -258,21 +258,31 @@
         // Exibir a tarja de sucesso
         document.getElementById('success-message').style.display = 'block';
 
-        // Exibir o campo com o link do vídeo salvo e o botão "Copiar"
+        // Exibir o campo com o link do vídeo salvo
         const videoLink = `https://drive.google.com/file/d/${data.id}/view`;
         const linkInput = document.getElementById('video-link');
         linkInput.value = videoLink;
-        document.getElementById('link-container').style.display = 'block';
+        document.getElementById('link-container').style.display = 'flex'; // Exibir o container do link
 
-        // Fechar a janela após copiar o link
-        document.getElementById('copy-button').addEventListener('click', function() {
+        // Ação do botão de copiar link
+        document.getElementById('copy-button').onclick = function() {
           linkInput.select();
-          document.execCommand('copy');
-          alert('Link copiado!');
-          window.close(); // Fechar a janela após copiar o link
+          document.execCommand('copy'); // Copiar o link
+          window.close(); // Fechar a janela
+        };
+
+        // Ação da tecla "G" para copiar o link e fechar a janela
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'g' || event.key === 'G') {
+            linkInput.select();
+            document.execCommand('copy'); // Copiar o link
+            window.close(); // Fechar a janela
+          }
         });
       })
       .catch((error) => {
+        // Ocultar o indicador de carregamento em caso de erro
+        document.getElementById('loading').style.display = 'none';
         console.error('Erro no upload para o Google Drive:', error);
         alert('Erro no upload para o Google Drive: ' + error.message);
       });
@@ -300,6 +310,7 @@
           }
         });
 
+        const stopButton = document.getElementById('stopButton');
         stopButton.addEventListener('click', stopRecording);
 
         function stopRecording() {
