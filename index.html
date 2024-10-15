@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Pacotes</title>
+  <title>Gravador de Vídeo Pacotes V2</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -204,27 +204,47 @@
 
     // Função para autenticar com Google Identity Services apenas uma vez
     function authenticate() {
-      if (accessToken) {
-        // Já autenticado, não precisa repetir
-        startRecording();
-      } else {
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com', // Substitua pelo seu Client ID
-          scope: 'https://www.googleapis.com/auth/drive.file',
-          callback: (response) => {
-            console.log('Autenticação bem-sucedida:', response);
-            accessToken = response.access_token; // Armazenar o token de acesso
-            localStorage.setItem('accessToken', accessToken); // Salvar o token no localStorage
-            startRecording(); // Iniciar a gravação após a autenticação
-          },
-        });
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com', // Substitua pelo seu Client ID
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: (response) => {
+          console.log('Autenticação bem-sucedida:', response);
+          accessToken = response.access_token; // Armazenar o token de acesso
+          localStorage.setItem('accessToken', accessToken); // Salvar o token no localStorage
+          startRecording(); // Iniciar a gravação após a autenticação
+        },
+      });
 
-        client.requestAccessToken();
+      client.requestAccessToken();
+    }
+
+    // Função para verificar se o token expirou e pedir nova autorização se necessário
+    function checkTokenExpiration() {
+      if (!accessToken) {
+        authenticate();
+      } else {
+        fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + accessToken)
+          .then(response => response.json())
+          .then(data => {
+            if (data.error) {
+              console.log('Token expirado. Solicitando nova autenticação.');
+              authenticate(); // Solicita nova autenticação
+            } else {
+              console.log('Token ainda válido. Iniciando upload.');
+              return true;
+            }
+          })
+          .catch(error => {
+            console.error('Erro ao verificar token:', error);
+            authenticate(); // Solicita nova autenticação em caso de erro
+          });
       }
     }
 
     // Função para carregar o arquivo no Google Drive
     function uploadToDrive(blob, fileName) {
+      checkTokenExpiration(); // Verificar se o token está válido ou solicitar nova autenticação
+
       const metadata = {
         'name': fileName,
         'mimeType': 'video/webm',
@@ -245,31 +265,28 @@
       })
       .then((res) => {
         if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}, statusText: ${res.statusText}`);
+          throw new Error(`HTTP error! status: ${res.status}, message: ${res.statusText}`);
         }
         return res.json();
       })
       .then((data) => {
-        console.log('Upload realizado com sucesso:', data);
-        
-        // Ocultar o indicador de carregamento
+        const fileId = data.id;
+        const link = `https://drive.google.com/file/d/${fileId}/view`;
+
+        // Atualizar a interface após o sucesso do upload
         document.getElementById('loading').style.display = 'none';
-
-        // Exibir a tarja de sucesso
         document.getElementById('success-message').style.display = 'block';
-
-        // Exibir o campo com o link do vídeo salvo
-        const videoLink = `https://drive.google.com/file/d/${data.id}/view`;
+        document.getElementById('link-container').style.display = 'block';
         const linkInput = document.getElementById('video-link');
-        linkInput.value = videoLink;
-        document.getElementById('link-container').style.display = 'flex'; // Exibir o container do link
+        linkInput.value = link;
 
-        // Ação do botão de copiar link
-        document.getElementById('copy-button').onclick = function() {
+        // Botão para copiar o link
+        const copyButton = document.getElementById('copy-button');
+        copyButton.addEventListener('click', () => {
           linkInput.select();
           document.execCommand('copy'); // Copiar o link
           window.close(); // Fechar a janela
-        };
+        });
 
         // Ação da tecla "G" para copiar o link e fechar a janela
         document.addEventListener('keydown', function(event) {
