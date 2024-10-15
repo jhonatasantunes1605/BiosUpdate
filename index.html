@@ -92,17 +92,6 @@
       justify-content: center;
     }
 
-    /* Mensagem de sucesso */
-    #success-message {
-      display: none;
-      margin-top: 20px;
-      background-color: #4CAF50;
-      color: white;
-      padding: 10px;
-      border-radius: 5px;
-      text-align: center;
-    }
-
     /* Configurações de layout responsivo */
     @media (max-width: 768px) {
       #container {
@@ -122,8 +111,6 @@
       <div id="message">PRESSIONE "G" PARA ENCERRAR A GRAVAÇÃO</div>
       <button class="stop-button" id="stopButton">Parar Gravação</button>
     </div>
-
-    <div id="success-message"></div> <!-- Mensagem de sucesso -->
   </div>
 
   <!-- Adicione o SDK do Google Identity Services -->
@@ -151,13 +138,10 @@
       const client = google.accounts.oauth2.initTokenClient({
         client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com',
         scope: 'https://www.googleapis.com/auth/drive.file',
+        redirect_uri: 'http://localhost:3000/callback',  // Atualize para o seu redirect_uri
         callback: (response) => {
-          if (response.error) {
-            console.error('Erro na autenticação:', response.error);
-          } else {
-            console.log('Autenticação bem-sucedida:', response);
-            accessToken = response.access_token; // Armazenar o token de acesso
-          }
+          console.log('Autenticação bem-sucedida:', response);
+          accessToken = response.access_token; // Armazenar o token de acesso
         },
       });
 
@@ -182,22 +166,10 @@
         body: form,
       }).then((res) => res.json())
         .then((data) => {
-          if (data.error) {
-            console.error('Erro ao fazer upload para o Google Drive:', data.error);
-          } else {
-            console.log('Upload realizado com sucesso:', data);
-            alert(`Upload realizado com sucesso! O arquivo foi salvo como: ${fileName}`);
-            
-            // Mostrar a mensagem de sucesso na página
-            const successMessage = document.getElementById('success-message');
-            successMessage.textContent = `Upload realizado com sucesso! O arquivo foi salvo como: ${fileName}`;
-            successMessage.style.display = 'block';
-
-            // Fechar a janela após 3 segundos
-            setTimeout(() => {
-              window.close();
-            }, 3000);
-          }
+          console.log('Upload realizado com sucesso:', data);
+          // Mostra uma confirmação e fecha a janela
+          alert(`Vídeo salvo como ${fileName}`);
+          setTimeout(() => window.close(), 3000);  // Fecha a janela após 3 segundos
         })
         .catch((error) => {
           console.error('Erro ao fazer upload para o Google Drive:', error);
@@ -252,36 +224,33 @@
           const hours = String(date.getHours()).padStart(2, '0');
           const minutes = String(date.getMinutes()).padStart(2, '0');
 
-          const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.mkv`;
+          const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.webm`;
 
-          // Upload para o Google Drive
+          // Chamar a função para upload no Google Drive
           uploadToDrive(blob, fileName);
         };
 
         // Função para iniciar o temporizador
         function startTimer() {
           timerInterval = setInterval(() => {
-            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-            const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
-            const seconds = String(elapsedTime % 60).padStart(2, '0');
-            timerElement.textContent = `${minutes}:${seconds}`;
+            const elapsedTime = Date.now() - startTime;
+            const minutes = Math.floor(elapsedTime / 60000);
+            const seconds = Math.floor((elapsedTime % 60000) / 1000);
+            timerElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
           }, 1000);
         }
 
         // Função para parar o temporizador
         function stopTimer() {
           clearInterval(timerInterval);
-          timerElement.textContent = '00:00';
         }
-      })
-      .catch(error => console.error('Erro ao acessar a câmera:', error));
 
-    // Autenticação automática ao carregar a página
-    window.onload = function() {
-      authenticate();
-    };
+      }).catch(error => {
+        console.error('Erro ao acessar a câmera:', error);
+      });
 
+    // Iniciar a autenticação com Google Identity Services
+    authenticate();
   </script>
 </body>
 </html>
-
