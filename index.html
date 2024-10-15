@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Pacotes V2</title>
+  <title>Gravador de Vídeo Pacotes V3</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -190,7 +190,8 @@
     let chunks = [];
     let startTime;
     let timerInterval;
-    let accessToken = localStorage.getItem('accessToken') || ''; // Obter token do localStorage
+    let accessToken = localStorage.getItem('accessToken');
+    let tokenExpiresAt = localStorage.getItem('tokenExpiresAt');
 
     // Configurações para capturar a qualidade máxima suportada pela câmera
     const constraints = {
@@ -202,15 +203,21 @@
       }
     };
 
-    // Função para autenticar com Google Identity Services apenas uma vez
+    // Função para autenticar com Google Identity Services
     function authenticate() {
       const client = google.accounts.oauth2.initTokenClient({
         client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com', // Substitua pelo seu Client ID
         scope: 'https://www.googleapis.com/auth/drive.file',
         callback: (response) => {
           console.log('Autenticação bem-sucedida:', response);
-          accessToken = response.access_token; // Armazenar o token de acesso
-          localStorage.setItem('accessToken', accessToken); // Salvar o token no localStorage
+          accessToken = response.access_token;
+          const expiresIn = response.expires_in; // Tempo de expiração do token em segundos
+          const expirationTime = Date.now() + expiresIn * 1000; // Calcula o tempo de expiração
+
+          // Salva o token e o tempo de expiração no localStorage
+          localStorage.setItem('accessToken', accessToken);
+          localStorage.setItem('tokenExpiresAt', expirationTime);
+          
           startRecording(); // Iniciar a gravação após a autenticação
         },
       });
@@ -218,32 +225,20 @@
       client.requestAccessToken();
     }
 
-    // Função para verificar se o token expirou e pedir nova autorização se necessário
+    // Função para verificar se o token expirou
     function checkTokenExpiration() {
-      if (!accessToken) {
+      const now = Date.now();
+      if (!accessToken || !tokenExpiresAt || now >= tokenExpiresAt) {
+        console.log('Token expirado ou inexistente. Reautenticando...');
         authenticate();
-      } else {
-        fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + accessToken)
-          .then(response => response.json())
-          .then(data => {
-            if (data.error) {
-              console.log('Token expirado. Solicitando nova autenticação.');
-              authenticate(); // Solicita nova autenticação
-            } else {
-              console.log('Token ainda válido. Iniciando upload.');
-              return true;
-            }
-          })
-          .catch(error => {
-            console.error('Erro ao verificar token:', error);
-            authenticate(); // Solicita nova autenticação em caso de erro
-          });
+        return false;
       }
+      return true;
     }
 
     // Função para carregar o arquivo no Google Drive
     function uploadToDrive(blob, fileName) {
-      checkTokenExpiration(); // Verificar se o token está válido ou solicitar nova autenticação
+      if (!checkTokenExpiration()) return; // Verificar a validade do token
 
       const metadata = {
         'name': fileName,
@@ -265,7 +260,7 @@
       })
       .then((res) => {
         if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}, message: ${res.statusText}`);
+          throw new Error(`Erro: ${res.statusText}`);
         }
         return res.json();
       })
@@ -377,8 +372,14 @@
       });
     }
 
-    // Autenticar ao carregar a página
-    window.onload = authenticate;
+    // Verificar o token ao carregar a página
+    window.onload = () => {
+      if (!checkTokenExpiration()) {
+        authenticate();
+      } else {
+        startRecording();
+      }
+    };
   </script>
 </body>
 </html>
