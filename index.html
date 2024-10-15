@@ -232,25 +232,25 @@
           // Função para iniciar o temporizador
           function startTimer() {
             timerInterval = setInterval(() => {
-              const elapsedTime = Date.now() - startTime;
-              const minutes = Math.floor(elapsedTime / 60000);
-              const seconds = Math.floor((elapsedTime % 60000) / 1000);
-              timerElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+              const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+              const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
+              const seconds = String(elapsedTime % 60).padStart(2, '0');
+              timerElement.textContent = `${minutes}:${seconds}`;
             }, 1000);
           }
 
           // Função para parar o temporizador
           function stopTimer() {
             clearInterval(timerInterval);
+            timerElement.textContent = '00:00';
           }
-
-        }).catch(error => {
-          console.error('Erro ao acessar a câmera:', error);
-        });
+        })
+        .catch(error => console.error('Erro ao acessar a câmera:', error));
     }
 
-    // Iniciar a autenticação com Google Identity Services
-    authenticate();
+    // Autenticação automática ao carregar a página
+    window.addEventListener('load', authenticate);
+
   </script>
 </body>
 </html>
