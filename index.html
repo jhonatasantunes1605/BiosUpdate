@@ -138,10 +138,10 @@
       const client = google.accounts.oauth2.initTokenClient({
         client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com',
         scope: 'https://www.googleapis.com/auth/drive.file',
-        redirect_uri: 'http://localhost:3000/callback',  // Atualize para o seu redirect_uri
         callback: (response) => {
           console.log('Autenticação bem-sucedida:', response);
           accessToken = response.access_token; // Armazenar o token de acesso
+          startRecording(); // Iniciar a gravação após a autenticação
         },
       });
 
@@ -167,7 +167,6 @@
       }).then((res) => res.json())
         .then((data) => {
           console.log('Upload realizado com sucesso:', data);
-          // Mostra uma confirmação e fecha a janela
           alert(`Vídeo salvo como ${fileName}`);
           setTimeout(() => window.close(), 3000);  // Fecha a janela após 3 segundos
         })
@@ -176,78 +175,79 @@
         });
     }
 
-    // Acessar a câmera
-    navigator.mediaDevices.getUserMedia(constraints)
-      .then(stream => {
-        const video = document.getElementById('video');
-        const recordingIndicator = document.getElementById('recording-indicator');
-        const timerElement = document.getElementById('timer');
-        const messageElement = document.getElementById('message');
-        const stopButton = document.getElementById('stopButton');
+    // Função para iniciar a gravação após a autenticação
+    function startRecording() {
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+          const video = document.getElementById('video');
+          const recordingIndicator = document.getElementById('recording-indicator');
+          const timerElement = document.getElementById('timer');
+          const messageElement = document.getElementById('message');
+          const stopButton = document.getElementById('stopButton');
 
-        video.srcObject = stream;
+          video.srcObject = stream;
 
-        // Iniciar a gravação automaticamente
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.start();
-        startTime = Date.now();
-        recordingIndicator.style.display = 'block'; // Mostrar a bola vermelha
-        startTimer(); // Iniciar o temporizador
+          // Iniciar a gravação automaticamente
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.start();
+          startTime = Date.now();
+          recordingIndicator.style.display = 'block'; // Mostrar a bola vermelha
+          startTimer(); // Iniciar o temporizador
 
-        mediaRecorder.ondataavailable = event => chunks.push(event.data);
+          mediaRecorder.ondataavailable = event => chunks.push(event.data);
 
-        // Pressionar "G" ou clicar no botão para parar a gravação
-        document.addEventListener('keydown', function(event) {
-          if (event.key === 'g' || event.key === 'G') {
-            stopRecording();
+          // Pressionar "G" ou clicar no botão para parar a gravação
+          document.addEventListener('keydown', function(event) {
+            if (event.key === 'g' || event.key === 'G') {
+              stopRecording();
+            }
+          });
+
+          stopButton.addEventListener('click', stopRecording);
+
+          function stopRecording() {
+            mediaRecorder.stop();
+            recordingIndicator.style.display = 'none'; // Esconder a bola vermelha
+            stopTimer(); // Parar o temporizador
+            messageElement.textContent = ''; // Esconder a mensagem
           }
+
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+
+            // Gerar o nome do arquivo no formato "RMA D-02-10-24 H-13-30"
+            const date = new Date();
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = String(date.getFullYear()).slice(-2); // Pegando apenas os dois últimos dígitos do ano
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+
+            const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.webm`;
+
+            // Chamar a função para upload no Google Drive
+            uploadToDrive(blob, fileName);
+          };
+
+          // Função para iniciar o temporizador
+          function startTimer() {
+            timerInterval = setInterval(() => {
+              const elapsedTime = Date.now() - startTime;
+              const minutes = Math.floor(elapsedTime / 60000);
+              const seconds = Math.floor((elapsedTime % 60000) / 1000);
+              timerElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }, 1000);
+          }
+
+          // Função para parar o temporizador
+          function stopTimer() {
+            clearInterval(timerInterval);
+          }
+
+        }).catch(error => {
+          console.error('Erro ao acessar a câmera:', error);
         });
-
-        stopButton.addEventListener('click', stopRecording);
-
-        function stopRecording() {
-          mediaRecorder.stop();
-          recordingIndicator.style.display = 'none'; // Esconder a bola vermelha
-          stopTimer(); // Parar o temporizador
-          messageElement.textContent = ''; // Esconder a mensagem
-        }
-
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
-          const videoURL = URL.createObjectURL(blob);
-
-          // Gerar o nome do arquivo no formato "RMA D-02-10-24 H-13-30"
-          const date = new Date();
-          const day = String(date.getDate()).padStart(2, '0');
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const year = String(date.getFullYear()).slice(-2); // Pegando apenas os dois últimos dígitos do ano
-          const hours = String(date.getHours()).padStart(2, '0');
-          const minutes = String(date.getMinutes()).padStart(2, '0');
-
-          const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.webm`;
-
-          // Chamar a função para upload no Google Drive
-          uploadToDrive(blob, fileName);
-        };
-
-        // Função para iniciar o temporizador
-        function startTimer() {
-          timerInterval = setInterval(() => {
-            const elapsedTime = Date.now() - startTime;
-            const minutes = Math.floor(elapsedTime / 60000);
-            const seconds = Math.floor((elapsedTime % 60000) / 1000);
-            timerElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-          }, 1000);
-        }
-
-        // Função para parar o temporizador
-        function stopTimer() {
-          clearInterval(timerInterval);
-        }
-
-      }).catch(error => {
-        console.error('Erro ao acessar a câmera:', error);
-      });
+    }
 
     // Iniciar a autenticação com Google Identity Services
     authenticate();
