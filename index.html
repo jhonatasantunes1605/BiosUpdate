@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Ant V1.0</title>
+  <title>Gravador de Vídeo Ant V1.5</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -15,18 +15,19 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      height: 110vh;
       flex-direction: column;
     }
 
     #container {
       width: 100%;
-      height: 90vh; /* Aumentar a altura da janela de gravação */
-      max-width: 1600px; /* Definir um limite para o tamanho da janela */
+      max-width: 1600px;
+      height: 90vh; /* Altura inicial maior */
       background-color: #2b2b2b;
       border-radius: 10px;
       overflow: hidden;
       box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.5);
+      transition: height 0.5s ease-in-out; /* Transição suave ao mudar a altura */
     }
 
     /* Estilos do vídeo */
@@ -70,7 +71,7 @@
     .stop-button {
       background-color: #ff3b3b;
       border: none;
-      padding: 10px 20px;
+      padding: 10px 10px;
       font-size: 16px;
       color: white;
       cursor: pointer;
@@ -124,15 +125,15 @@
       display: flex;
       align-items: center;
       justify-content: flex-start; /* Alinhar à esquerda */
-      padding: 0 20px; /* Aumentar o espaçamento entre a borda da janela */
+      padding: 0 20px; /* Espaçamento maior da borda da janela */
     }
 
     #video-link {
       background-color: white;
       color: black;
-      width: 70%;
+      width: 50%;
       padding: 10px;
-      border-radius: 5px;
+      border-radius: 10px;
       font-size: 14px;
       margin-left: 10px; /* Espaçamento entre o botão e o campo de link */
     }
