@@ -277,31 +277,38 @@
       .then((response) => response.json())
       .then((data) => {
         document.getElementById('loading').style.display = 'none'; // Ocultar indicador de carregamento
-        const fileId = data.id;
-        const fileLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 
-        // Mostrar mensagem de sucesso e o link
-        document.getElementById('success-message').style.display = 'block';
-        document.getElementById('link-container').style.display = 'block';
-        const linkInput = document.getElementById('video-link');
-        linkInput.value = fileLink;
+        // Verificar se o ID do arquivo foi retornado corretamente
+        if (data.id) {
+          const fileId = data.id;
+          const fileLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 
-        // Ação do botão de copiar
-        const copyButton = document.getElementById('copy-button');
-        copyButton.addEventListener('click', function () {
-          linkInput.select();
-          document.execCommand('copy');
-          window.close(); // Fechar a janela
-        });
+          // Mostrar mensagem de sucesso e o link
+          document.getElementById('success-message').style.display = 'block';
+          document.getElementById('link-container').style.display = 'block';
+          const linkInput = document.getElementById('video-link');
+          linkInput.value = fileLink;
 
-        // Ação da tecla "G" para copiar o link e fechar a janela
-        document.addEventListener('keydown', function(event) {
-          if (event.key === 'g' || event.key === 'G') {
+          // Ação do botão de copiar
+          const copyButton = document.getElementById('copy-button');
+          copyButton.addEventListener('click', function () {
             linkInput.select();
-            document.execCommand('copy'); // Copiar o link
+            document.execCommand('copy');
             window.close(); // Fechar a janela
-          }
-        });
+          });
+
+          // Ação da tecla "G" para copiar o link e fechar a janela
+          document.addEventListener('keydown', function(event) {
+            if (event.key === 'g' || event.key === 'G') {
+              linkInput.select();
+              document.execCommand('copy'); // Copiar o link
+              window.close(); // Fechar a janela
+            }
+          });
+        } else {
+          console.error('Erro: ID do arquivo não foi retornado corretamente', data);
+          alert('Erro ao carregar o vídeo no Google Drive. Tente novamente.');
+        }
       })
       .catch((error) => {
         // Ocultar o indicador de carregamento em caso de erro
