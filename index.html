@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Ant V1.6</title>
+  <title>Gravador de Vídeo Ant V1.5</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -180,7 +180,7 @@
   <div id="success-message">Vídeo salvo com sucesso!</div>
   <div id="loading">Salvando vídeo e gerando link, por favor aguarde...</div>
   <div id="link-container">
-    <button id="copy-button">Copiar Link (G)</button>
+    <button id="copy-button">Copiar Link (G)</button> <!-- Botão à esquerda do campo de link -->
     <input type="text" id="video-link" readonly>
   </div>
 
@@ -204,16 +204,12 @@
       }
     };
 
-    // Função para detectar e mover a janela para a segunda tela
+    // Função para detectar e mover para a segunda tela (se disponível)
     function moveToSecondScreen() {
       if (window.screen && window.screen.length > 1) {
-        const secondScreen = window.screen.screens[1]; // Captura a segunda tela
+        const secondScreen = window.screen.screens[1]; // Pega a segunda tela
         window.moveTo(secondScreen.left, secondScreen.top); // Mover a janela para a segunda tela
-        window.resizeTo(secondScreen.width, secondScreen.height); // Redimensionar para ocupar toda a tela
-      } else {
-        // Caso não haja uma segunda tela, redimensionar a janela principal
-        window.resizeTo(1600, 900); // Definindo um tamanho padrão de 1600x900
-        window.moveTo(100, 100); // Posicionar a janela em uma posição visível
+        window.resizeTo(secondScreen.width, secondScreen.height); // Redimensionar para ocupar a tela toda
       }
     }
 
@@ -235,9 +231,30 @@
         client.requestAccessToken();
       }
     }
+    // Função para renovar o token
+    function renewTokenIfNeeded() {
+      return new Promise((resolve, reject) => {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com', // Substitua pelo seu Client ID
+          scope: 'https://www.googleapis.com/auth/drive.file',
+          callback: (response) => {
+            if (response.access_token) {
+              accessToken = response.access_token;
+              localStorage.setItem('accessToken', accessToken);
+              resolve(accessToken);
+            } else {
+              reject('Erro ao renovar o token de acesso.');
+            }
+          },
+        });
+
+        client.requestAccessToken();
+      });
+    }
 
     // Função para carregar o arquivo no Google Drive
     async function uploadToDrive(blob, fileName) {
+      // Tentar renovar o token se estiver expirado
       try {
         if (!accessToken) {
           await renewTokenIfNeeded();
@@ -257,6 +274,7 @@
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', blob);
 
+      // Mostrar indicador de carregamento
       document.getElementById('loading').style.display = 'block';
 
       fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
@@ -266,92 +284,118 @@
       })
       .then((response) => response.json())
       .then((data) => {
-        document.getElementById('loading').style.display = 'none';
+        document.getElementById('loading').style.display = 'none'; // Ocultar indicador de carregamento
         const fileId = data.id;
-        const fileLink = `https://drive.google.com/file/d/${fileId}/view`;
+        const fileLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 
-        // Exibir link e mensagem de sucesso
+        // Mostrar mensagem de sucesso e o link
         document.getElementById('success-message').style.display = 'block';
-        document.getElementById('video-link').value = fileLink;
-        document.getElementById('link-container').style.display = 'flex';
+        document.getElementById('link-container').style.display = 'block';
+        const linkInput = document.getElementById('video-link');
+        linkInput.value = fileLink;
 
-        // Copiar o link automaticamente
-        navigator.clipboard.writeText(fileLink);
+        // Ação do botão de copiar
+        const copyButton = document.getElementById('copy-button');
+        copyButton.addEventListener('click', function () {
+          linkInput.select();
+          document.execCommand('copy');
+          window.close(); // Fechar a janela
+        });
+
+        // Ação da tecla "G" para copiar o link e fechar a janela
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'g' || event.key === 'G') {
+            linkInput.select();
+            document.execCommand('copy'); // Copiar o link
+            window.close(); // Fechar a janela
+          }
+        });
       })
       .catch((error) => {
+        // Ocultar o indicador de carregamento em caso de erro
         document.getElementById('loading').style.display = 'none';
-        alert('Erro ao enviar para o Google Drive: ' + error);
+        console.error('Erro no upload para o Google Drive:', error);
+        alert('Erro no upload para o Google Drive: ' + error.message);
       });
     }
 
-    // Função de gravação do vídeo
-    async function startRecording() {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      const videoElement = document.getElementById('video');
-      videoElement.srcObject = stream;
+    // Função para iniciar a gravação
+    function startRecording() {
+      navigator.mediaDevices.getUserMedia(constraints)
+      .then(stream => {
+        const videoElement = document.getElementById('video');
+        videoElement.srcObject = stream;
 
-      mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.start();
+        startTime = Date.now();
+        document.getElementById('recording-indicator').style.display = 'block'; // Mostrar a bola vermelha
+        startTimer(); // Iniciar o temporizador
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
+        mediaRecorder.ondataavailable = event => chunks.push(event.data);
+
+        // Pressionar "G" ou clicar no botão para parar a gravação
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'g' || event.key === 'G') {
+            stopRecording();
+          }
+        });
+
+        const stopButton = document.getElementById('stopButton');
+        stopButton.addEventListener('click', stopRecording);
+
+        function stopRecording() {
+          mediaRecorder.stop();
+          document.getElementById('recording-indicator').style.display = 'none'; // Esconder a bola vermelha
+          stopTimer(); // Parar o temporizador
+          document.getElementById('message').textContent = ''; // Esconder a mensagem
         }
-      };
 
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        chunks = [];
-        const fileName = `Gravacao-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
-        await uploadToDrive(blob, fileName);
-      };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const videoURL = URL.createObjectURL(blob);
 
-      mediaRecorder.start();
-      document.getElementById('recording-indicator').style.display = 'block';
-      startTime = Date.now();
-      timerInterval = setInterval(updateTimer, 1000);
+          // Gerar o nome do arquivo no formato "RMA D-02-10-24 H-13-30"
+          const date = new Date();
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = String(date.getFullYear()).slice(-2); // Pegando apenas os dois últimos dígitos do ano
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+
+          const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.mkv`;
+
+          // Upload para o Google Drive
+          uploadToDrive(blob, fileName);
+        };
+
+        // Função para iniciar o temporizador
+        function startTimer() {
+          timerInterval = setInterval(() => {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
+            const seconds = String(elapsedTime % 60).padStart(2, '0');
+            document.getElementById('timer').textContent = `${minutes}:${seconds}`;
+          }, 1000);
+        }
+
+        // Função para parar o temporizador
+        function stopTimer() {
+          clearInterval(timerInterval);
+          document.getElementById('timer').textContent = '00:00'; // Reiniciar o temporizador
+        }
+      })
+      .catch(error => {
+        console.error('Erro ao acessar a câmera:', error);
+        alert('Erro ao acessar a câmera: ' + error.message);
+      });
     }
 
-    // Função de parar a gravação
-    function stopRecording() {
-      mediaRecorder.stop();
-      clearInterval(timerInterval);
-      document.getElementById('recording-indicator').style.display = 'none';
-    }
-
-    // Função para atualizar o temporizador de gravação
-    function updateTimer() {
-      const elapsedTime = Date.now() - startTime;
-      const minutes = Math.floor(elapsedTime / 60000);
-      const seconds = Math.floor((elapsedTime % 60000) / 1000);
-      document.getElementById('timer').textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
-
-    // Função para abrir a janela de gravação com o tamanho maior e mover para a segunda tela
-    function openRecorder() {
-      const width = 1600;
-      const height = 900;
-      const left = (window.screen.width - width) / 2;
-      const top = (window.screen.height - height) / 2;
-
-      const recorderWindow = window.open('gravador.html', 'Gravador', `width=${width},height=${height},left=${left},top=${top}`);
-
-      recorderWindow.onload = function() {
-        recorderWindow.moveToSecondScreen();
-      };
-    }
-
-    // Eventos de inicialização e teclado
-    window.onload = function() {
-      authenticate();
+     // Autenticar ao carregar a página
+    window.onload = () => {
+      moveToSecondScreen(); // Tentar mover para a segunda tela
+      authenticate(); // Iniciar autenticação
     };
-
-    window.onkeydown = (event) => {
-      if (event.key === 'g') {
-        stopRecording();
-      }
-    };
-
-    document.getElementById('stopButton').addEventListener('click', stopRecording);
   </script>
 </body>
 </html>
