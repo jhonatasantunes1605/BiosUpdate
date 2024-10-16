@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Ant V1.5</title>
+  <title>Gravador de Vídeo Ant V1.0</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -20,9 +20,7 @@
     }
 
     #container {
-      width: 100%;
-      height: 90vh; /* Aumentar a altura da janela de gravação */
-      max-width: 1600px; /* Definir um limite para o tamanho da janela */
+      width: 800px;
       background-color: #2b2b2b;
       border-radius: 10px;
       overflow: hidden;
@@ -32,7 +30,7 @@
     /* Estilos do vídeo */
     video {
       width: 100%;
-      height: 80%; /* O vídeo ocupa 80% da altura disponível */
+      height: auto;
       border-bottom: 2px solid #000;
     }
 
@@ -70,7 +68,7 @@
     .stop-button {
       background-color: #ff3b3b;
       border: none;
-      padding: 10px 10px;
+      padding: 10px 20px;
       font-size: 16px;
       color: white;
       cursor: pointer;
@@ -123,18 +121,18 @@
       margin-top: 10px;
       display: flex;
       align-items: center;
-      justify-content: flex-start; /* Alinhar à esquerda */
-      padding: 0 20px; /* Espaçamento maior da borda da janela */
+      justify-content: center;
+      flex-direction: column;
     }
 
     #video-link {
       background-color: white;
       color: black;
-      width: 50%;
+      width: 70%;
       padding: 10px;
-      border-radius: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
       font-size: 14px;
-      margin-left: 10px; /* Espaçamento entre o botão e o campo de link */
     }
 
     #copy-button {
@@ -180,8 +178,8 @@
   <div id="success-message">Vídeo salvo com sucesso!</div>
   <div id="loading">Salvando vídeo e gerando link, por favor aguarde...</div>
   <div id="link-container">
-    <button id="copy-button">Copiar Link (G)</button> <!-- Botão à esquerda do campo de link -->
     <input type="text" id="video-link" readonly>
+    <button id="copy-button">Copiar Link (G)</button> <!-- Botão para copiar o link -->
   </div>
 
   <!-- Adicione o SDK do Google Identity Services -->
@@ -204,33 +202,27 @@
       }
     };
 
-    // Função para detectar e mover para a segunda tela (se disponível)
-    function moveToSecondScreen() {
-      if (window.screen && window.screen.length > 1) {
-        const secondScreen = window.screen.screens[1]; // Pega a segunda tela
-        window.moveTo(secondScreen.left, secondScreen.top); // Mover a janela para a segunda tela
-        window.resizeTo(secondScreen.width, secondScreen.height); // Redimensionar para ocupar a tela toda
-      }
-    }
-
     // Função para autenticar com Google Identity Services apenas uma vez
     function authenticate() {
       if (accessToken) {
+        // Já autenticado, não precisa repetir
         startRecording();
       } else {
         const client = google.accounts.oauth2.initTokenClient({
-          client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com',
+          client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com', // Substitua pelo seu Client ID
           scope: 'https://www.googleapis.com/auth/drive.file',
           callback: (response) => {
-            accessToken = response.access_token;
-            localStorage.setItem('accessToken', accessToken);
-            startRecording();
+            console.log('Autenticação bem-sucedida:', response);
+            accessToken = response.access_token; // Armazenar o token de acesso
+            localStorage.setItem('accessToken', accessToken); // Salvar o token no localStorage
+            startRecording(); // Iniciar a gravação após a autenticação
           },
         });
 
         client.requestAccessToken();
       }
     }
+
     // Função para renovar o token
     function renewTokenIfNeeded() {
       return new Promise((resolve, reject) => {
@@ -391,11 +383,8 @@
       });
     }
 
-     // Autenticar ao carregar a página
-    window.onload = () => {
-      moveToSecondScreen(); // Tentar mover para a segunda tela
-      authenticate(); // Iniciar autenticação
-    };
+    // Autenticar ao carregar a página
+    window.onload = authenticate;
   </script>
 </body>
 </html>
