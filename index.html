@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Ant V1.6</title>
+  <title>Gravador de Vídeo Ant V1.7</title>
   <style>
-    /* Configurações gerais de layout e cores */
     body {
       margin: 0;
       padding: 0;
@@ -16,27 +15,22 @@
       justify-content: center;
       align-items: center;
       height: 100vh;
-      flex-direction: column;
     }
 
     #container {
-      width: 100%;
-      height: 90vh; /* Aumentar a altura da janela de gravação */
-      max-width: 1600px; /* Definir um limite para o tamanho da janela */
+      width: 800px;
       background-color: #2b2b2b;
       border-radius: 10px;
       overflow: hidden;
       box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.5);
     }
 
-    /* Estilos do vídeo */
     video {
       width: 100%;
-      height: 80%; /* O vídeo ocupa 80% da altura disponível */
+      height: auto;
       border-bottom: 2px solid #000;
     }
 
-    /* Indicador de gravação */
     #recording-indicator {
       position: absolute;
       top: 20px;
@@ -49,7 +43,6 @@
       box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
     }
 
-    /* Barra de controle estilo OBS */
     #controls {
       display: flex;
       justify-content: space-between;
@@ -58,7 +51,6 @@
       background-color: #3d3d3d;
     }
 
-    /* Temporizador de gravação */
     #timer {
       font-size: 24px;
       font-weight: bold;
@@ -66,11 +58,10 @@
       color: #00ff00;
     }
 
-    /* Botão de parar a gravação */
     .stop-button {
       background-color: #ff3b3b;
       border: none;
-      padding: 10px 10px;
+      padding: 10px 20px;
       font-size: 16px;
       color: white;
       cursor: pointer;
@@ -82,85 +73,63 @@
       background-color: #ff0000;
     }
 
-    /* Mensagem de instrução */
     #message {
       font-size: 16px;
       color: #b3b3b3;
     }
 
-    /* Estilos de alinhamento geral */
     .centered {
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    /* Tarja verde de sucesso */
-    #success-message {
-      display: none;
-      background-color: #28a745;
-      color: white;
-      padding: 10px;
-      text-align: center;
-      font-size: 16px;
-      margin-top: 20px;
-      border-radius: 5px;
-      width: 100%;
-    }
-
-    /* Indicador de carregamento */
     #loading {
       display: none;
-      color: #00ff00;
       font-size: 18px;
+      color: #00ff00;
       text-align: center;
       margin-top: 10px;
     }
 
-    /* Campo de texto com o link e botão de copiar */
+    #success-message {
+      display: none;
+      font-size: 18px;
+      color: #00ff00;
+      text-align: center;
+      margin-top: 10px;
+    }
+
     #link-container {
       display: none;
       margin-top: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start; /* Alinhar à esquerda */
-      padding: 0 20px; /* Espaçamento maior da borda da janela */
+      text-align: center;
     }
 
     #video-link {
-      background-color: white;
-      color: black;
-      width: 50%;
+      width: 70%;
       padding: 10px;
-      border-radius: 10px;
-      font-size: 14px;
-      margin-left: 10px; /* Espaçamento entre o botão e o campo de link */
+      font-size: 16px;
     }
 
     #copy-button {
-      background-color: #007bff;
+      padding: 10px;
+      background-color: #4caf50;
       color: white;
+      font-size: 16px;
       border: none;
-      padding: 10px 20px;
-      font-size: 14px;
       cursor: pointer;
       border-radius: 5px;
-      transition: background-color 0.3s;
     }
 
     #copy-button:hover {
-      background-color: #0056b3;
+      background-color: #45a049;
     }
 
-    /* Configurações de layout responsivo */
     @media (max-width: 768px) {
       #container {
         width: 100%;
         margin: 0 10px;
-      }
-
-      #video-link {
-        width: 100%;
       }
     }
   </style>
@@ -175,13 +144,14 @@
       <div id="message">PRESSIONE "G" PARA ENCERRAR A GRAVAÇÃO</div>
       <button class="stop-button" id="stopButton">Parar Gravação</button>
     </div>
-  </div>
 
-  <div id="success-message">Vídeo salvo com sucesso!</div>
-  <div id="loading">Salvando vídeo e gerando link, por favor aguarde...</div>
-  <div id="link-container">
-    <button id="copy-button">Copiar Link (G)</button> <!-- Botão à esquerda do campo de link -->
-    <input type="text" id="video-link" readonly>
+    <div id="loading">Salvando vídeo, por favor aguarde...</div>
+    <div id="success-message">Vídeo salvo com sucesso!</div>
+
+    <div id="link-container">
+      <input type="text" id="video-link" readonly />
+      <button id="copy-button">Copiar Link (G)</button>
+    </div>
   </div>
 
   <!-- Adicione o SDK do Google Identity Services -->
@@ -192,9 +162,8 @@
     let chunks = [];
     let startTime;
     let timerInterval;
-    let accessToken = localStorage.getItem('accessToken') || ''; // Obter token do localStorage
+    let accessToken = ''; // Variável global para armazenar o token
 
-    // Configurações para capturar a qualidade máxima suportada pela câmera
     const constraints = {
       video: {
         width: { ideal: 1920 },
@@ -204,61 +173,31 @@
       }
     };
 
-    // Função para detectar e mover para a segunda tela (se disponível)
-    function moveToSecondScreen() {
-      if (window.screen && window.screen.length > 1) {
-        const secondScreen = window.screen.screens[1]; // Pega a segunda tela
-        window.moveTo(secondScreen.left, secondScreen.top); // Mover a janela para a segunda tela
-        window.resizeTo(secondScreen.width, secondScreen.height); // Redimensionar para ocupar a tela toda
-      }
-    }
-
-    // Função para autenticar com Google Identity Services apenas uma vez
     function authenticate() {
-      if (accessToken) {
-        startRecording();
-      } else {
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com',
-          scope: 'https://www.googleapis.com/auth/drive.file',
-          callback: (response) => {
-            accessToken = response.access_token;
-            localStorage.setItem('accessToken', accessToken);
-            startRecording();
-          },
-        });
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com',
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: (response) => {
+          console.log('Autenticação bem-sucedida:', response);
+          accessToken = response.access_token;
+          console.log('Access Token:', accessToken);
+        },
+      });
 
-        client.requestAccessToken();
+      client.requestAccessToken();
+    }
+
+    async function renewTokenIfNeeded() {
+      // Checar se o token está expirado ou inválido
+      if (!accessToken) {
+        console.log('Token expirado. Renovando token...');
+        authenticate();
       }
     }
-    // Função para renovar o token
-    function renewTokenIfNeeded() {
-      return new Promise((resolve, reject) => {
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: '794168976403-g75q12b0jv7frnu3vmg920r4i8e7st4m.apps.googleusercontent.com', // Substitua pelo seu Client ID
-          scope: 'https://www.googleapis.com/auth/drive.file',
-          callback: (response) => {
-            if (response.access_token) {
-              accessToken = response.access_token;
-              localStorage.setItem('accessToken', accessToken);
-              resolve(accessToken);
-            } else {
-              reject('Erro ao renovar o token de acesso.');
-            }
-          },
-        });
 
-        client.requestAccessToken();
-      });
-    }
-
-    // Função para carregar o arquivo no Google Drive
     async function uploadToDrive(blob, fileName) {
-      // Tentar renovar o token se estiver expirado
       try {
-        if (!accessToken) {
-          await renewTokenIfNeeded();
-        }
+        await renewTokenIfNeeded();
       } catch (error) {
         alert('Falha ao renovar o token: ' + error);
         return;
@@ -267,140 +206,117 @@
       const metadata = {
         'name': fileName,
         'mimeType': 'video/webm',
-        'parents': ['1-3GvrQ8LXVmLuzqqwJ0c_gd0SqVdTPAR'] // ID da pasta no Google Drive onde você deseja salvar o arquivo
+        'parents': ['1-3GvrQ8LXVmLuzqqwJ0c_gd0SqVdTPAR']
       };
 
       const form = new FormData();
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       form.append('file', blob);
 
-      // Mostrar indicador de carregamento
       document.getElementById('loading').style.display = 'block';
 
       fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-  method: 'POST',
-  headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
-  body: form,
-})
-.then((response) => response.json())
-.then((data) => {
-  if (data.id) {
-    const fileId = data.id;
-    const fileLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+        method: 'POST',
+        headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
+        body: form,
+      })
+      .then((response) => response.json())
+      .then((data) => {
+        document.getElementById('loading').style.display = 'none';
 
-    // Mostrar mensagem de sucesso e o link
-    document.getElementById('success-message').style.display = 'block';
-    document.getElementById('link-container').style.display = 'block';
-    const linkInput = document.getElementById('video-link');
-    linkInput.value = fileLink;
+        if (data.id) {
+          const fileId = data.id;
+          const fileLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 
-    // Ação do botão de copiar
-    const copyButton = document.getElementById('copy-button');
-    copyButton.addEventListener('click', function () {
-      linkInput.select();
-      document.execCommand('copy');
-      window.close(); // Fechar a janela
-    });
+          document.getElementById('success-message').style.display = 'block';
+          document.getElementById('link-container').style.display = 'block';
+          const linkInput = document.getElementById('video-link');
+          linkInput.value = fileLink;
 
-    // Ação da tecla "G" para copiar o link e fechar a janela
-    document.addEventListener('keydown', function(event) {
-      if (event.key === 'g' || event.key === 'G') {
-        linkInput.select();
-        document.execCommand('copy'); // Copiar o link
-        window.close(); // Fechar a janela
-      }
-    });
-  } else {
-    console.error('Erro: o ID do arquivo não foi retornado corretamente:', data);
-    alert('Erro ao obter o link do arquivo. Verifique se o upload foi concluído corretamente.');
-  }
-})
-.catch((error) => {
-  // Ocultar o indicador de carregamento em caso de erro
-  document.getElementById('loading').style.display = 'none';
-  console.error('Erro no upload para o Google Drive:', error);
-  alert('Erro no upload para o Google Drive: ' + error.message);
-});
+          const copyButton = document.getElementById('copy-button');
+          copyButton.addEventListener('click', function () {
+            linkInput.select();
+            document.execCommand('copy');
+            window.close();
+          });
 
+          document.addEventListener('keydown', function(event) {
+            if (event.key === 'g' || event.key === 'G') {
+              linkInput.select();
+              document.execCommand('copy');
+              window.close();
+            }
+          });
+        } else {
+          console.error('Erro: ID do arquivo não foi retornado corretamente', data);
+          alert('Erro ao carregar o vídeo no Google Drive. Tente novamente.');
+        }
+      })
+      .catch((error) => {
+        document.getElementById('loading').style.display = 'none';
+        console.error('Erro no upload para o Google Drive:', error);
+        alert('Erro no upload para o Google Drive: ' + error.message);
+      });
     }
 
-    // Função para iniciar a gravação
-    function startRecording() {
-      navigator.mediaDevices.getUserMedia(constraints)
+    navigator.mediaDevices.getUserMedia(constraints)
       .then(stream => {
-        const videoElement = document.getElementById('video');
-        videoElement.srcObject = stream;
+        const video = document.getElementById('video');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        const timerElement = document.getElementById('timer');
+        const messageElement = document.getElementById('message');
+        const stopButton = document.getElementById('stopButton');
+
+        video.srcObject = stream;
 
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.start();
         startTime = Date.now();
-        document.getElementById('recording-indicator').style.display = 'block'; // Mostrar a bola vermelha
-        startTimer(); // Iniciar o temporizador
+        recordingIndicator.style.display = 'block';
+        startTimer();
 
         mediaRecorder.ondataavailable = event => chunks.push(event.data);
 
-        // Pressionar "G" ou clicar no botão para parar a gravação
         document.addEventListener('keydown', function(event) {
           if (event.key === 'g' || event.key === 'G') {
             stopRecording();
           }
         });
 
-        const stopButton = document.getElementById('stopButton');
         stopButton.addEventListener('click', stopRecording);
 
         function stopRecording() {
           mediaRecorder.stop();
-          document.getElementById('recording-indicator').style.display = 'none'; // Esconder a bola vermelha
-          stopTimer(); // Parar o temporizador
-          document.getElementById('message').textContent = ''; // Esconder a mensagem
+          recordingIndicator.style.display = 'none';
+          stopTimer();
+          messageElement.textContent = 'Processando gravação...';
+
+          mediaRecorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const fileName = `gravacao-${new Date().toISOString().replace(/:/g, '-')}.webm`;
+            await uploadToDrive(blob, fileName);
+          };
         }
 
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
-          const videoURL = URL.createObjectURL(blob);
-
-          // Gerar o nome do arquivo no formato "RMA D-02-10-24 H-13-30"
-          const date = new Date();
-          const day = String(date.getDate()).padStart(2, '0');
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const year = String(date.getFullYear()).slice(-2); // Pegando apenas os dois últimos dígitos do ano
-          const hours = String(date.getHours()).padStart(2, '0');
-          const minutes = String(date.getMinutes()).padStart(2, '0');
-
-          const fileName = `RMA D-${day}-${month}-${year} H-${hours}-${minutes}.mkv`;
-
-          // Upload para o Google Drive
-          uploadToDrive(blob, fileName);
-        };
-
-        // Função para iniciar o temporizador
         function startTimer() {
           timerInterval = setInterval(() => {
-            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-            const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
-            const seconds = String(elapsedTime % 60).padStart(2, '0');
-            document.getElementById('timer').textContent = `${minutes}:${seconds}`;
+            const elapsedTime = Date.now() - startTime;
+            const minutes = Math.floor(elapsedTime / 60000);
+            const seconds = Math.floor((elapsedTime % 60000) / 1000);
+            timerElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
           }, 1000);
         }
 
-        // Função para parar o temporizador
         function stopTimer() {
           clearInterval(timerInterval);
-          document.getElementById('timer').textContent = '00:00'; // Reiniciar o temporizador
         }
       })
       .catch(error => {
         console.error('Erro ao acessar a câmera:', error);
         alert('Erro ao acessar a câmera: ' + error.message);
       });
-    }
 
-     // Autenticar ao carregar a página
-    window.onload = () => {
-      moveToSecondScreen(); // Tentar mover para a segunda tela
-      authenticate(); // Iniciar autenticação
-    };
+    authenticate(); // Chama a autenticação ao carregar a página
   </script>
 </body>
 </html>
