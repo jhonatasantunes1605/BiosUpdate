@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Ant V1.3</title>
+  <title>Gravador de Vídeo Ant V1.0</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -15,14 +15,14 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 200vh;
+      height: 100vh;
       flex-direction: column;
     }
 
     #container {
       width: 100%;
-      height: 150vh; /* Aumentar a altura da janela de gravação */
-      max-width: 2000px; /* Definir um limite para o tamanho da janela */
+      height: 90vh; /* Aumentar a altura da janela de gravação */
+      max-width: 1600px; /* Definir um limite para o tamanho da janela */
       background-color: #2b2b2b;
       border-radius: 10px;
       overflow: hidden;
@@ -123,8 +123,8 @@
       margin-top: 10px;
       display: flex;
       align-items: center;
-      justify-content: center;
-      flex-direction: column;
+      justify-content: flex-start; /* Alinhar à esquerda */
+      padding: 0 20px; /* Aumentar o espaçamento entre a borda da janela */
     }
 
     #video-link {
@@ -133,8 +133,8 @@
       width: 70%;
       padding: 10px;
       border-radius: 5px;
-      margin-bottom: 10px;
       font-size: 14px;
+      margin-left: 10px; /* Espaçamento entre o botão e o campo de link */
     }
 
     #copy-button {
@@ -180,8 +180,8 @@
   <div id="success-message">Vídeo salvo com sucesso!</div>
   <div id="loading">Salvando vídeo e gerando link, por favor aguarde...</div>
   <div id="link-container">
+    <button id="copy-button">Copiar Link (G)</button> <!-- Botão à esquerda do campo de link -->
     <input type="text" id="video-link" readonly>
-    <button id="copy-button">Copiar Link (G)</button> <!-- Botão para copiar o link -->
   </div>
 
   <!-- Adicione o SDK do Google Identity Services -->
