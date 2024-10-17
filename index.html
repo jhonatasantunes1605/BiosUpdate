@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gravador de Vídeo Ant V2.0</title>
+  <title>Gravador de Vídeo Ant V2.1</title>
   <style>
     /* Configurações gerais de layout e cores */
     body {
@@ -244,51 +244,52 @@
     }
 
     async function uploadToDrive(blob, fileName) {
-      try {
-        if (!accessToken) {
-          await renewTokenIfNeeded();
-        }
-      } catch (error) {
-        alert('Falha ao renovar o token: ' + error);
-        return;
-      }
-
-      const metadata = {
-        'name': fileName,
-        'mimeType': 'video/webm',
-        'parents': ['1-3GvrQ8LXVmLuzqqwJ0c_gd0SqVdTPAR'] // ID da pasta no Google Drive onde você deseja salvar o arquivo
-      };
-
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', blob);
-
-      document.getElementById('loading').style.display = 'block';
-
-      fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
-        body: form,
-      })
-      .then((response) => response.json())
-      .then((data) => {
-        document.getElementById('loading').style.display = 'none';
-        if (data.id) {
-          const fileId = data.id;
-          const fileLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
-          document.getElementById('video-link').value = fileLink;
-          document.getElementById('link-container').style.display = 'flex';
-          recordingStopped = true; // Permite a cópia e fechamento
-        } else {
-          alert('Erro ao fazer upload. O ID do arquivo não foi encontrado.');
-        }
-      })
-      .catch((error) => {
-        document.getElementById('loading').style.display = 'none';
-        console.error('Erro no upload para o Google Drive:', error);
-        alert('Erro ao carregar o vídeo: ' + error.message);
-      });
+  try {
+    if (!accessToken) {
+      await renewTokenIfNeeded();
     }
+  } catch (error) {
+    alert('Falha ao renovar o token: ' + error);
+    return;
+  }
+
+  const metadata = {
+    'name': fileName,
+    'mimeType': 'video/webm',
+    'parents': ['1-3GvrQ8LXVmLuzqqwJ0c_gd0SqVdTPAR'] // Verifique se esse ID de pasta está correto e acessível
+  };
+
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', blob);
+
+  document.getElementById('loading').style.display = 'block';
+
+  fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
+    body: form,
+  })
+  .then((response) => response.json())
+  .then((data) => {
+    document.getElementById('loading').style.display = 'none';
+    console.log('Dados de resposta do Google Drive:', data); // Adiciona um log detalhado da resposta
+    if (data.id) {
+      const fileId = data.id;
+      const fileLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+      document.getElementById('video-link').value = fileLink;
+      document.getElementById('link-container').style.display = 'flex';
+      recordingStopped = true; // Permite a cópia e fechamento
+    } else {
+      alert('Erro ao fazer upload. O ID do arquivo não foi encontrado. Resposta: ' + JSON.stringify(data));
+    }
+  })
+  .catch((error) => {
+    document.getElementById('loading').style.display = 'none';
+    console.error('Erro no upload para o Google Drive:', error);
+    alert('Erro ao carregar o vídeo: ' + error.message);
+  });
+}
 
     // Função para iniciar a gravação de vídeo
     function startRecording() {
